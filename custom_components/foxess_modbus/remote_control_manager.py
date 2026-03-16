@@ -28,6 +28,7 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
         self._discharge_power: int | None = None
         self._charge_power: int | None = None
         self._max_soc_override: int | None = None
+        self._export_limit: int | None = None
 
         modbus_addresses = [
             *self._addresses.battery_soc,
@@ -73,6 +74,38 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
     @max_soc.setter
     def max_soc(self, value: int | None) -> None:
         self._max_soc_override = value
+
+    @property
+    def export_limit(self) -> int | None:
+        """Read the export limit from the configured address(es)"""
+        address = self._address_config.export_limit
+        if address is None:
+            return None
+        # .read handles both int and list[int] automatically in this integration
+        return self._controller.read(address, signed=False)
+
+    @export_limit.setter
+    def export_limit(self, value: int | None) -> None:
+        """Write the export limit to the configured address(es)"""
+        self._export_limit = value
+        address = self._address_config.export_limit
+
+        if value is not None and address is not None:
+            if isinstance(address, list):
+                # For Smart 15: address is [46616, 46617]
+                # We write as a 32-bit value.
+                # value // 65536 goes to 46616, value % 65536 goes to 46617
+                high_word = int(value) // 65536
+                low_word = int(value) % 65536
+
+                self._controller.hass.async_create_task(
+                    self._controller.write_registers(address[0], [high_word, low_word])
+                )
+            else:
+                # For older H1/H3: address is a single int (e.g. 41012)
+                self._controller.hass.async_create_task(
+                    self._controller.write_register(address, int(value))
+                )
 
     async def _update(self) -> None:
         if not self._controller.is_connected:

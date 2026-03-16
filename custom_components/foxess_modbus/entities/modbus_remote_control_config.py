@@ -179,7 +179,32 @@ class ModbusRemoteControlFactory:
             value_setter=_set_max_soc,
         )
 
+        def _set_export_limit(manager: EntityRemoteControlManager, value: int) -> None:
+            # This 'value' is what comes from the UI (likely in Watts if scaled by 0.001)
+            manager.export_limit = value
+
+        # Updated filter to include the Smart 15 (H3_SMART)
+        relevant_models = [
+            x.get_all_models() for x in self.address_specs
+            if x.models & (Inv.KH_SET | Inv.H3_SET | Inv.H3_SMART | Inv.H3_PRO_SET)
+        ]
+
+        export_limit = ModbusRemoteControlNumberDescription(
+            key="export_limit",
+            name="Export Limit",
+            models=relevant_models,
+            native_max_value_callback=lambda x: x.inverter_capacity,
+            mode=NumberMode.BOX,
+            device_class=NumberDeviceClass.POWER,
+            native_min_value=0.0,
+            native_step=0.001,
+            native_unit_of_measurement="kW",
+            scale=1.0, # See note below on scaling
+            value_setter=_set_export_limit,
+        )
+
         self.entity_descriptions: list[EntityFactory] = [
+            export_limit,
             charge_power,
             discharge_power,
             remote_control_select,
