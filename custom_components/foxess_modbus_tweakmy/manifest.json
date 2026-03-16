@@ -1,5 +1,5 @@
 {
-  "domain": "foxess_modbus",
+  "domain": "foxess_modbus_tweakmy",
   "name": "FoxESS - Modbus",
   "codeowners": ["@nathanmarlor"],
   "config_flow": true,

@@ -1,8 +1,7 @@
 {
-  "name": "FoxESS - Modbus(tweakmy)",
-  "hacs": "1.20.0",
+  "name": "FoxESS - Modbus tweakmy",
+  "content_in_root": false,
+  "domains": ["foxess_modbus_tweakmy"],
   "homeassistant": "2025.1.0",
-  "render_readme": true,
-  "zip_release": true,
-  "filename": "foxess_modbus.zip"
+  "render_readme": true
 }
