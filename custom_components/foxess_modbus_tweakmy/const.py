@@ -2,7 +2,7 @@
 
 # Base component constants
 NAME = "foxess_modbus"
-DOMAIN = "foxess_modbus"
+DOMAIN = "foxess_modbus_tweakmy"
 DOMAIN_DATA = f"{DOMAIN}_data"
 
 ISSUE_URL = "https://github.com/nathanmarlor/foxess_modbus/issues"
