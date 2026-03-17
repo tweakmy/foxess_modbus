@@ -510,6 +510,13 @@ class ModbusController(EntityController, UnloadController):
                     self._connection_type_profile.register_type,
                     self._slave,
                 )
+                _LOGGER.debug(
+                    "Read values from %s %s: start_address=%s, values=%s",
+                    self._client,
+                    self._slave,
+                    start_address,
+                    reads,
+                )
                 read_values.append((start_address, reads))
 
             except ModbusClientFailedError as ex:

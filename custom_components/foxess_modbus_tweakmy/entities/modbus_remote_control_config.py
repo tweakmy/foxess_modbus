@@ -38,7 +38,8 @@ class ModbusRemoteControlAddressConfig:
     """Work mode control"""
     work_mode_map: dict[WorkMode, int] | None
     """Map of work mode ->value"""
-
+    export_limit: list[int] | None
+    """Export limit registers (optional)"""
     battery_soc: list[int]
     """Current battery SoC. If multiple values, these are the socs of the different batteries"""
     max_soc: int | None
@@ -193,12 +194,12 @@ class ModbusRemoteControlFactory:
             key="export_limit",
             name="Export Limit",
             models=relevant_models,
-            native_max_value_callback=lambda x: x.inverter_capacity,
+            native_max_value_callback=lambda x: 60000,
             mode=NumberMode.BOX,
             device_class=NumberDeviceClass.POWER,
             native_min_value=0.0,
-            native_step=0.001,
-            native_unit_of_measurement="kW",
+            native_step=1,
+            native_unit_of_measurement="W",
             scale=1.0, # See note below on scaling
             value_setter=_set_export_limit,
         )
