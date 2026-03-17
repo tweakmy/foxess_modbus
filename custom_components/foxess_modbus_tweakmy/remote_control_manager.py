@@ -119,6 +119,8 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
                     self._controller.write_register(address, int(value))
                 )
 
+            self._export_limit = self._controller.read(address, signed=False)
+
     async def _update(self) -> None:
         if not self._controller.is_connected:
             self._prev_mode = RemoteControlMode.DISABLE
