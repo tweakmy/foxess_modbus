@@ -100,22 +100,24 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
         self._export_limit = value
         address = self._addresses.export_limit
 
-        # if value is not None and address is not None:
-        #     if isinstance(address, list):
-        #         # For Smart 15: address is [46616, 46617]
-        #         # We write as a 32-bit value.
-        #         # value // 65536 goes to 46616, value % 65536 goes to 46617
-        #         high_word = int(value) // 65536
-        #         low_word = int(value) % 65536
+        if value is not None and address is not None:
+            if isinstance(address, list) and len(address) == 2:
+                # address[1] is the High Word (Multiples of 65536)
+                # address[0] is the Low Word (The remainder)
+                high_word = int(value) >> 16
+                low_word = int(value) & 0xFFFF
 
-        #         self._controller.hass.async_create_task(
-        #             self._controller.write_registers(address[0], [high_word, low_word])
-        #         )
-        #     else:
-        #         # For older H1/H3: address is a single int (e.g. 41012)
-        #         self._controller.hass.async_create_task(
-        #             self._controller.write_register(address, int(value))
-        #         )
+                # We must write to both registers.
+                # Since address[0] and address[1] are likely 46616 and 46617 (sequential),
+                # we write them in the order the inverter expects them in memory.
+                self._controller.hass.async_create_task(
+                    self._controller.write_registers(address[0], [low_word, high_word])
+                )
+            else:
+                # For single register models (H1/H3/KH legacy)
+                self._controller.hass.async_create_task(
+                    self._controller.write_register(address, int(value))
+                )
 
     async def _update(self) -> None:
         if not self._controller.is_connected:
