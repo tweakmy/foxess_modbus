@@ -35,6 +35,7 @@ class ModbusRemoteControlNumberDescription(NumberEntityDescription, EntityFactor
     mode: NumberMode = NumberMode.AUTO
     scale: float = 1.0
     signed: bool = False
+    value_getter: Callable[[EntityRemoteControlManager], int | None]
     value_setter: Callable[[EntityRemoteControlManager, int], None]
 
     @property
@@ -95,6 +96,24 @@ class ModbusRemoteControlNumber(ModbusEntityMixin, RestoreNumber, NumberEntity):
     def mode(self) -> NumberMode:
         return cast(ModbusRemoteControlNumberDescription, self.entity_description).mode
 
+    @property
+    def native_value(self) -> float | None:
+        entity_description = cast(ModbusRemoteControlNumberDescription, self.entity_description)
+        raw = entity_description.value_getter(self._manager)
+        if raw is None:
+            return None
+
+        value = raw * entity_description.scale
+        if (
+            self.entity_description.native_min_value is not None
+            and self.entity_description.native_max_value is not None
+        ):
+            value = max(
+                self.entity_description.native_min_value,
+                min(self.entity_description.native_max_value, value),
+            )
+        return value
+
     async def async_set_native_value(self, value: float) -> None:
         self._update_native_value(value)
 
@@ -104,8 +123,7 @@ class ModbusRemoteControlNumber(ModbusEntityMixin, RestoreNumber, NumberEntity):
         if max_value is not None:
             native_max_value = max_value * entity_description.scale
             self._attr_native_max_value = native_max_value
-            if self._attr_native_value is None or self._attr_native_value > native_max_value:
-                self._update_native_value(native_max_value)
+        self.schedule_update_ha_state()
 
     def _update_native_value(self, native_value: float) -> None:
         entity_description = cast(ModbusRemoteControlNumberDescription, self.entity_description)
@@ -117,11 +135,11 @@ class ModbusRemoteControlNumber(ModbusEntityMixin, RestoreNumber, NumberEntity):
 
         self._attr_native_value = native_value
 
-        scaled = int(native_value / entity_description.scale)
+        scaled = int(round(native_value / entity_description.scale))
         entity_description.value_setter(self._manager, scaled)
 
         self.schedule_update_ha_state()
 
     @property
     def addresses(self) -> list[int]:
-        return []
+        return self._manager.addresses

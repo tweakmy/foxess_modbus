@@ -131,6 +131,7 @@ class ModbusRemoteControlFactory:
             # The register is negative
             scale=-0.001,
             signed=True,
+            value_getter=lambda manager: -manager.charge_power if manager.charge_power is not None else None,
             value_setter=_set_charge_power,
         )
 
@@ -151,6 +152,7 @@ class ModbusRemoteControlFactory:
             native_unit_of_measurement="kW",
             scale=-0.001,
             signed=True,
+            value_getter=lambda manager: -manager.discharge_power if manager.discharge_power is not None else None,
             value_setter=_set_discharge_power,
         )
 
@@ -177,6 +179,7 @@ class ModbusRemoteControlFactory:
             native_step=1,
             native_unit_of_measurement="%",
             icon="mdi:battery-arrow-up",
+            value_getter=lambda manager: manager.max_soc,
             value_setter=_set_max_soc,
         )
 
@@ -200,7 +203,8 @@ class ModbusRemoteControlFactory:
             native_min_value=0.0,
             native_step=1,
             native_unit_of_measurement="W",
-            scale=1.0, # See note below on scaling
+            scale=1.0,
+            value_getter=lambda manager: manager.export_limit,
             value_setter=_set_export_limit,
         )
 

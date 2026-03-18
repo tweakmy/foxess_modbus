@@ -81,16 +81,16 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
         address = self._addresses.export_limit
         if address is None:
             return None
+
         if isinstance(address, list) and len(address) == 2:
-            high_word = self._controller.read(address[1], signed=False)
-            low_word = self._controller.read(address[0], signed=False)
-            if high_word is None or low_word is None:
+            # Export limit is capped well within 16-bit range for supported models, so only the low word is relevant.
+            low_address = max(address)
+            low_word = self._controller.read(low_address, signed=False)
+            if low_word is None:
                 return None
-            else:
-                self._export_limit = (high_word << 16) | low_word
+            self._export_limit = low_word
         else:
-            value = self._controller.read(address, signed=False)
-            self._export_limit = value
+            self._export_limit = self._controller.read(address, signed=False)
 
         return self._export_limit
 
@@ -101,25 +101,31 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
         address = self._addresses.export_limit
 
         if value is not None and address is not None:
+            int_value = int(value)
             if isinstance(address, list) and len(address) == 2:
-                # address[1] is the High Word (Multiples of 65536)
-                # address[0] is the Low Word (The remainder)
-                high_word = int(value) >> 16
-                low_word = int(value) & 0xFFFF
+                high_word = int_value >> 16
+                low_word = int_value & 0xFFFF
 
-                # We must write to both registers.
-                # Since address[0] and address[1] are likely 46616 and 46617 (sequential),
-                # we write them in the order the inverter expects them in memory.
+                start_address = min(address)
+                current_high_word = self._controller.read(start_address, signed=False)
+                current_low_word = self._controller.read(start_address + 1, signed=False)
+
+                async def _write_export_limit() -> None:
+                    if current_high_word != high_word or current_low_word != low_word:
+                        await self._controller.write_registers(start_address, [high_word, low_word])
+
+                self._controller.hass.async_create_task(_write_export_limit())
+            elif isinstance(address, list) and len(address) == 1:
                 self._controller.hass.async_create_task(
-                    self._controller.write_registers(address[0], [low_word, high_word])
+                    self._controller.write_register(address[0], int_value)
                 )
             else:
                 # For single register models (H1/H3/KH legacy)
                 self._controller.hass.async_create_task(
-                    self._controller.write_register(address, int(value))
+                    self._controller.write_register(address, int_value)
                 )
 
-            self._export_limit = self._controller.read(address, signed=False)
+            self._export_limit = int_value
 
     async def _update(self) -> None:
         if not self._controller.is_connected:
