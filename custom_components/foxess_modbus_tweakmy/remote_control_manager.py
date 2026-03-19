@@ -32,6 +32,7 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
 
         modbus_addresses = [
             *self._addresses.battery_soc,
+            self._addresses.remote_enable,
             self._addresses.work_mode,
             *(self._addresses.export_limit if self._addresses.export_limit is not None else []),
             self._addresses.max_soc,
@@ -93,6 +94,17 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
             self._export_limit = self._controller.read(address, signed=False)
 
         return self._export_limit
+
+    @property
+    def remote_control_enabled(self) -> bool | None:
+        value = self._controller.read(self._addresses.remote_enable, signed=False)
+        if value is None:
+            return None
+        return value != 0
+
+    @property
+    def remote_enable_address(self) -> int | None:
+        return self._addresses.remote_enable
 
     @export_limit.setter
     def export_limit(self, value: int | None) -> None:
@@ -317,8 +329,8 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
         if export_power is None or export_power > inverter_capacity:
             export_power = inverter_capacity
 
-        # If remote control stops, we still want to feed in as much as possible
-        await self._enable_remote_control(WorkMode.FEED_IN_FIRST)
+        # If remote control stops, fall back to Self Use
+        await self._enable_remote_control(WorkMode.SELF_USE)
         # Positive values = discharge
         await self._write_active_power(export_power)
 

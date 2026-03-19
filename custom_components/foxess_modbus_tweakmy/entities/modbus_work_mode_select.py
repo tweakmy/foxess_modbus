@@ -12,6 +12,7 @@ from .modbus_select import ModbusSelectDescription
 
 _FORCE_CHARGE = "Force Charge"
 _FORCE_DISCHARGE = "Force Discharge"
+_INVALID = "Invalid"
 
 
 @dataclass(kw_only=True, **ENTITY_DESCRIPTION_KWARGS)
@@ -44,17 +45,26 @@ class ModbusWorkModeSelect(ModbusSelect):
     def current_option(self) -> str | None:
         if self._controller.remote_control_manager is not None:
             mode = self._controller.remote_control_manager.mode
+            remote_control_enabled = self._controller.remote_control_manager.remote_control_enabled
             self._prev_remote_control_mode = mode
 
-            if mode == RemoteControlMode.FORCE_CHARGE:
+            if remote_control_enabled is False and mode == RemoteControlMode.DISABLE:
+                self._prev_remote_control_mode = None
+                return super().current_option
+            if remote_control_enabled is True and mode == RemoteControlMode.FORCE_CHARGE:
                 return _FORCE_CHARGE
-            if mode == RemoteControlMode.FORCE_DISCHARGE:
+            if remote_control_enabled is True and mode == RemoteControlMode.FORCE_DISCHARGE:
                 return _FORCE_DISCHARGE
+
+            return _INVALID
 
         self._prev_remote_control_mode = None
         return super().current_option
 
     async def async_select_option(self, option: str) -> None:
+        if option == _INVALID:
+            return
+
         if option in (_FORCE_CHARGE, _FORCE_DISCHARGE):
             assert self._controller.remote_control_manager is not None
             mode = RemoteControlMode.FORCE_CHARGE if option == _FORCE_CHARGE else RemoteControlMode.FORCE_DISCHARGE
@@ -67,6 +77,17 @@ class ModbusWorkModeSelect(ModbusSelect):
         # This update might not cause a register update (which is what triggers HA to update its state), so do this
         # explicitly
         self.async_schedule_update_ha_state()
+
+    @property
+    def addresses(self) -> list[int]:
+        addresses = list(super().addresses)
+
+        if self._controller.remote_control_manager is not None:
+            remote_enable_address = self._controller.remote_control_manager.remote_enable_address
+            if remote_enable_address is not None:
+                addresses.append(remote_enable_address)
+
+        return addresses
 
     def update_callback(self, changed_addresses: set[int]) -> None:
         super().update_callback(changed_addresses)

@@ -131,7 +131,8 @@ class ModbusRemoteControlFactory:
             # The register is negative
             scale=-0.001,
             signed=True,
-            value_getter=lambda manager: -manager.charge_power if manager.charge_power is not None else None,
+            value_source="user",
+            value_note="User-set target used by remote control logic; not read back from a dedicated Modbus register.",
             value_setter=_set_charge_power,
         )
 
@@ -152,7 +153,8 @@ class ModbusRemoteControlFactory:
             native_unit_of_measurement="kW",
             scale=-0.001,
             signed=True,
-            value_getter=lambda manager: -manager.discharge_power if manager.discharge_power is not None else None,
+            value_source="user",
+            value_note="User-set target used by remote control logic; not read back from a dedicated Modbus register.",
             value_setter=_set_discharge_power,
         )
 
@@ -179,6 +181,8 @@ class ModbusRemoteControlFactory:
             native_step=1,
             native_unit_of_measurement="%",
             icon="mdi:battery-arrow-up",
+            value_source="user",
+            value_note="User override used when inverter Max SoC register is unavailable for this model.",
             value_getter=lambda manager: manager.max_soc,
             value_setter=_set_max_soc,
         )
@@ -201,9 +205,11 @@ class ModbusRemoteControlFactory:
             mode=NumberMode.BOX,
             device_class=NumberDeviceClass.POWER,
             native_min_value=0.0,
-            native_step=1,
-            native_unit_of_measurement="W",
-            scale=1.0,
+            native_step=0.001,
+            native_unit_of_measurement="kW",
+            scale=0.001,
+            value_source="modbus",
+            value_note="Displayed in kW in UI; Modbus register value is read/written in W.",
             value_getter=lambda manager: manager.export_limit,
             value_setter=_set_export_limit,
         )

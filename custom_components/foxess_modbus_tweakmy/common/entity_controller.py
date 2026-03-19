@@ -90,6 +90,16 @@ class EntityRemoteControlManager(ABC):
     def export_limit(self, value: int | None) -> None:
         """Set the export limit"""
 
+    @property
+    @abstractmethod
+    def remote_control_enabled(self) -> bool | None:
+        """Returns the current value of the remote enable register, if available"""
+
+    @property
+    @abstractmethod
+    def remote_enable_address(self) -> int | None:
+        """Returns the remote enable register address, if available"""
+
 
 
 class EntityController(ABC):

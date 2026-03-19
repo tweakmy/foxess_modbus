@@ -35,8 +35,12 @@ class ModbusRemoteControlNumberDescription(NumberEntityDescription, EntityFactor
     mode: NumberMode = NumberMode.AUTO
     scale: float = 1.0
     signed: bool = False
-    value_getter: Callable[[EntityRemoteControlManager], int | None]
     value_setter: Callable[[EntityRemoteControlManager, int], None]
+    value_getter: Callable[[EntityRemoteControlManager], int | None] | None = None
+    value_source: str = "modbus"
+    """Metadata for UI/state attributes: 'modbus' or 'user'"""
+    value_note: str | None = None
+    """Optional human-readable note for UI/state attributes"""
 
     @property
     def entity_type(self) -> type[Entity]:
@@ -99,6 +103,9 @@ class ModbusRemoteControlNumber(ModbusEntityMixin, RestoreNumber, NumberEntity):
     @property
     def native_value(self) -> float | None:
         entity_description = cast(ModbusRemoteControlNumberDescription, self.entity_description)
+        if entity_description.value_getter is None:
+            return self._attr_native_value
+
         raw = entity_description.value_getter(self._manager)
         if raw is None:
             return None
@@ -143,3 +150,16 @@ class ModbusRemoteControlNumber(ModbusEntityMixin, RestoreNumber, NumberEntity):
     @property
     def addresses(self) -> list[int]:
         return self._manager.addresses
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str | bool] | None:
+        entity_description = cast(ModbusRemoteControlNumberDescription, self.entity_description)
+        attrs: dict[str, str | bool] = {
+            "value_source": entity_description.value_source,
+            "modbus_readback": entity_description.value_source == "modbus",
+        }
+
+        if entity_description.value_note is not None:
+            attrs["value_note"] = entity_description.value_note
+
+        return attrs
