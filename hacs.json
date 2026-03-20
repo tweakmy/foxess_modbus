@@ -1,7 +1,7 @@
 {
-  "name": "FoxESS - Modbus tweakmy",
+  "name": "FoxESS - Modbus",
   "content_in_root": false,
-  "domains": ["foxess_modbus_tweakmy"],
+  "domains": ["foxess_modbus"],
   "homeassistant": "2025.1.0",
   "render_readme": true
 }
