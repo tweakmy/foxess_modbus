@@ -119,7 +119,7 @@ class ModbusRemoteControlFactory:
 
         charge_power = ModbusRemoteControlNumberDescription(
             key="force_charge_power",
-            name="Force Charge Power",
+            name="Desired Force Charge Power",
             models=all_models,
             native_max_value_callback=lambda x: -x.inverter_capacity,  # - to counteract -ve scale
             mode=NumberMode.BOX,
@@ -142,7 +142,7 @@ class ModbusRemoteControlFactory:
         # hass type hints are messed up, and mypy doesn't see inherited dataclass properties on the EntityDescriptions
         discharge_power = ModbusRemoteControlNumberDescription(
             key="force_discharge_power",
-            name="Force Discharge Power",
+            name="Desired Force Discharge Power",
             models=all_models,
             native_max_value_callback=lambda x: -x.inverter_capacity,  # - to counteract -ve scale
             mode=NumberMode.BOX,
@@ -171,7 +171,7 @@ class ModbusRemoteControlFactory:
         # Models without max_soc get one of these
         force_charge_max_soc = ModbusRemoteControlNumberDescription(
             key="force_charge_max_soc",
-            name="Force Charge Max SoC",
+            name="Desired Force Charge Max SoC",
             models=[x.get_models_without_max_soc() for x in self.address_specs],
             native_min_value=0.0,
             native_max_value_callback=lambda _x: 100,
