@@ -24,8 +24,10 @@ jobs:
       - name: Patch manifest and zip
         run: |
           TAG=${{ github.ref_name }}
+          VERSION=${TAG#v}
+          VERSION=${VERSION%TK}
           cd custom_components/foxess_modbus/
-          jq ".version=\"${TAG#v}\"" manifest.json > manifest.json.tmp
+          jq ".version=\"${VERSION}\"" manifest.json > manifest.json.tmp
           mv manifest.json.tmp manifest.json
           zip ../../foxess_modbus.zip -r ./
       - name: Create or update release
