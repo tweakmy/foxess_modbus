@@ -24,10 +24,13 @@ jobs:
       - name: Patch manifest and zip
         run: |
           TAG=${{ github.ref_name }}
-          cd custom_components/foxess_modbus/
-          jq ".version=\"${TAG#v}\"" manifest.json > manifest.json.tmp
-          mv manifest.json.tmp manifest.json
-          zip ../../foxess_modbus.zip -r ./
+          rm -rf package foxess_modbus.zip
+          mkdir -p package/custom_components/foxess_modbus
+          cp -a custom_components/foxess_modbus/. package/custom_components/foxess_modbus/
+          jq ".version=\"${TAG#v}\"" package/custom_components/foxess_modbus/manifest.json > package/custom_components/foxess_modbus/manifest.json.tmp
+          mv package/custom_components/foxess_modbus/manifest.json.tmp package/custom_components/foxess_modbus/manifest.json
+          cd package
+          zip ../foxess_modbus.zip -r custom_components
       - name: Create or update release
         run: |
           TAG=${{ github.ref_name }}
