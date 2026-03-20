@@ -6,6 +6,11 @@
 
 \*\* **This project is not endorsed by, directly affiliated with, maintained, authorized, or sponsored by FoxESS** \*\*
 
+## Project Credits
+
+- Original author: nathanmarlor
+- Improved updates: JoEe ([GitHub][joee-github])
+
 ## Introduction
 
 A Home Assistant custom component which communicates with FoxESS H-series inverters and derivatives without using FoxESS's cloud.
@@ -99,3 +104,4 @@ Sets all charge periods in one service call. The service "Update Charge Period" 
 [forum]: https://community.home-assistant.io/
 [releases-shield]: https://img.shields.io/github/release/nathanmarlor/foxess_modbus.svg?style=for-the-badge
 [releases]: https://github.com/nathanmarlor/foxess_modbus/releases
+[joee-github]: https://github.com/JoEe
