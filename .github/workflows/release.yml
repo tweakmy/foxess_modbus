@@ -2,7 +2,7 @@ name: Create a release
 on:
   push:
     tags:
-      - "*"
+      - "v*TK"
 
 permissions:
   contents: write
@@ -22,9 +22,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/checkout@v4
+      - name: Validate tag format
+        run: |
+          TAG=${{ github.ref_name }}
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+TK$ ]]; then
+            echo "Invalid tag: $TAG"
+            echo "Expected format: v<major>.<minor>.<patch>TK (example: v1.0.0TK)"
+            exit 1
+          fi
       - name: Patch manifest and zip
         run: |
-          TAG=${{ github.ref_NAME }}
+          TAG=${{ github.ref_name }}
           cd custom_components/foxess_modbus/
           jq ".version=\"${TAG#v}\"" manifest.json > manifest.json.tmp
           mv manifest.json.tmp manifest.json
