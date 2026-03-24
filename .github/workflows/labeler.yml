@@ -1,15 +1,7 @@
 name: Manage labels
 
 on:
-  push:
-    branches:
-      - main
-      - master
-    paths:
-      - .github/labels.yml
-  pull_request:
-    paths:
-      - .github/labels.yml
+  workflow_dispatch:
 
 jobs:
   labeler:

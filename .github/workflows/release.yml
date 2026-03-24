@@ -1,8 +1,6 @@
 name: Create a release
 on:
-  push:
-    tags:
-      - "v*TK"
+  workflow_dispatch:
 
 permissions:
   contents: write
