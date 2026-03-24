@@ -43,6 +43,11 @@ class RemoteControlMode(Enum):
 class EntityRemoteControlManager(ABC):
     @property
     @abstractmethod
+    def addresses(self) -> list[int]:
+        """The Modbus addresses used by remote control entities"""
+
+    @property
+    @abstractmethod
     def mode(self) -> RemoteControlMode:
         """Get the current mode"""
 

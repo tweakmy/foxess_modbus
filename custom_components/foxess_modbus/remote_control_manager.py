@@ -79,21 +79,49 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
 
     @property
     def export_limit(self) -> int | None:
-        address = self._addresses.export_limit
-        if address is None:
+        addresses = self._addresses.export_limit
+        if addresses is None:
             return None
 
-        if isinstance(address, list) and len(address) == 2:
+        if len(addresses) == 2:
             # Export limit is capped well within 16-bit range for supported models, so only the low word is relevant.
-            low_address = max(address)
+            low_address = max(addresses)
             low_word = self._controller.read(low_address, signed=False)
             if low_word is None:
                 return None
             self._export_limit = low_word
         else:
-            self._export_limit = self._controller.read(address, signed=False)
+            self._export_limit = self._controller.read(addresses[0], signed=False)
 
         return self._export_limit
+
+    @export_limit.setter
+    def export_limit(self, value: int | None) -> None:
+        """Write the export limit to the configured address(es)"""
+        self._export_limit = value
+        addresses = self._addresses.export_limit
+
+        if value is None or addresses is None:
+            return
+
+        int_value = int(value)
+        if len(addresses) == 2:
+            high_word = int_value >> 16
+            low_word = int_value & 0xFFFF
+
+            start_address = min(addresses)
+            current_high_word = self._controller.read(start_address, signed=False)
+            current_low_word = self._controller.read(start_address + 1, signed=False)
+
+            async def _write_export_limit() -> None:
+                if current_high_word != high_word or current_low_word != low_word:
+                    await self._controller.write_registers(start_address, [high_word, low_word])
+
+            self._controller.hass.async_create_task(_write_export_limit())
+        else:
+            self._controller.hass.async_create_task(self._controller.write_register(addresses[0], int_value))
+
+        self._export_limit = int_value
 
     @property
     def remote_control_enabled(self) -> bool | None:
@@ -105,39 +133,6 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
     @property
     def remote_enable_address(self) -> int | None:
         return self._addresses.remote_enable
-
-    @export_limit.setter
-    def export_limit(self, value: int | None) -> None:
-        """Write the export limit to the configured address(es)"""
-        self._export_limit = value
-        address = self._addresses.export_limit
-
-        if value is not None and address is not None:
-            int_value = int(value)
-            if isinstance(address, list) and len(address) == 2:
-                high_word = int_value >> 16
-                low_word = int_value & 0xFFFF
-
-                start_address = min(address)
-                current_high_word = self._controller.read(start_address, signed=False)
-                current_low_word = self._controller.read(start_address + 1, signed=False)
-
-                async def _write_export_limit() -> None:
-                    if current_high_word != high_word or current_low_word != low_word:
-                        await self._controller.write_registers(start_address, [high_word, low_word])
-
-                self._controller.hass.async_create_task(_write_export_limit())
-            elif isinstance(address, list) and len(address) == 1:
-                self._controller.hass.async_create_task(
-                    self._controller.write_register(address[0], int_value)
-                )
-            else:
-                # For single register models (H1/H3/KH legacy)
-                self._controller.hass.async_create_task(
-                    self._controller.write_register(address, int_value)
-                )
-
-            self._export_limit = int_value
 
     async def _update(self) -> None:
         if not self._controller.is_connected:
