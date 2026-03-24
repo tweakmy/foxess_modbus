@@ -97,8 +97,6 @@ class RemoteControlAddressSpec:
             address = accessor(address_config)
             addresses[register_type] = [address] if address is not None else None
         return ModbusAddressSpecBase(addresses, self.models)
-
-
 @dataclass
 class ModbusRemoteControlFactory:
     """
@@ -193,7 +191,8 @@ class ModbusRemoteControlFactory:
 
         # Updated filter to include the Smart 15 (H3_SMART)
         relevant_models = [
-            x.get_all_models() for x in self.address_specs
+            x.get_all_models()
+            for x in self.address_specs
             if x.models & (Inv.KH_SET | Inv.H3_SET | Inv.H3_SMART | Inv.H3_PRO_SET)
         ]
 
