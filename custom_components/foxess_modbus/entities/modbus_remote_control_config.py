@@ -201,7 +201,7 @@ class ModbusRemoteControlFactory:
             key="export_limit",
             name="Export Limit",
             models=relevant_models,
-            native_max_value_callback=lambda x: 60000,
+            native_max_value_callback=lambda _x: 60000,
             mode=NumberMode.BOX,
             device_class=NumberDeviceClass.POWER,
             native_min_value=0.0,
