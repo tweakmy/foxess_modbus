@@ -105,6 +105,7 @@ class EntityRemoteControlManager(ABC):
     def remote_enable_address(self) -> int | None:
         """Returns the remote enable register address, if available"""
 
+
 class EntityController(ABC):
     """Interface given to entities to access the ModbusController"""
 
