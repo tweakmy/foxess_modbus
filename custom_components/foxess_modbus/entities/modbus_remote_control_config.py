@@ -97,6 +97,8 @@ class RemoteControlAddressSpec:
             address = accessor(address_config)
             addresses[register_type] = [address] if address is not None else None
         return ModbusAddressSpecBase(addresses, self.models)
+
+
 @dataclass
 class ModbusRemoteControlFactory:
     """
