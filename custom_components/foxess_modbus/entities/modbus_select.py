@@ -80,14 +80,25 @@ class ModbusSelect(ModbusEntityMixin, SelectEntity):
         entity_description = cast(ModbusSelectDescription, self.entity_description)
         value = self._controller.read(self._address, signed=False)
         if value is None:
+            _LOGGER.debug(
+                "Select '%s' at address %s has no current register value; returning unknown",
+                self.entity_id,
+                self._address,
+            )
             return None
         if not self._validate(entity_description.validate, value):
+            _LOGGER.debug(
+                "Select '%s' at address %s rejected raw value %s during validation; returning unknown",
+                self.entity_id,
+                self._address,
+                value,
+            )
             return None
 
         selected = entity_description.options_map.get(value)
         if selected is None:
             _LOGGER.warning(
-                "Select option (%s) for address (%s) is not valid. Valid values: (%s)",
+                "Select option (%s) for address (%s) is not valid. Valid values: (%s). Home Assistant may show unknown.",
                 value,
                 self._address,
                 entity_description.options_map,

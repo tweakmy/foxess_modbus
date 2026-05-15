@@ -193,8 +193,7 @@ class ModbusRemoteControlFactory:
 
         # Updated filter to include the Smart 15 (H3_SMART)
         relevant_models = [
-            x.get_all_models()
-            for x in self.address_specs
+            x.get_all_models() for x in self.address_specs
             if x.models & (Inv.KH_SET | Inv.H3_SET | Inv.H3_SMART | Inv.H3_PRO_SET)
         ]
 
@@ -202,7 +201,7 @@ class ModbusRemoteControlFactory:
             key="export_limit",
             name="Export Limit",
             models=relevant_models,
-            native_max_value_callback=lambda _x: 60000,
+            native_max_value_callback=lambda x: 60000,
             mode=NumberMode.BOX,
             device_class=NumberDeviceClass.POWER,
             native_min_value=0.0,

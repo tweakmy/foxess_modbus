@@ -49,7 +49,9 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
         return self._mode
 
     async def set_mode(self, mode: RemoteControlMode) -> None:
-        if self._mode != mode:
+        should_force_disable = mode == RemoteControlMode.DISABLE and self.remote_control_enabled is not False
+
+        if self._mode != mode or should_force_disable:
             self._mode = mode
             await self._update()
 
@@ -79,49 +81,21 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
 
     @property
     def export_limit(self) -> int | None:
-        addresses = self._addresses.export_limit
-        if addresses is None:
+        address = self._addresses.export_limit
+        if address is None:
             return None
 
-        if len(addresses) == 2:
+        if isinstance(address, list) and len(address) == 2:
             # Export limit is capped well within 16-bit range for supported models, so only the low word is relevant.
-            low_address = max(addresses)
+            low_address = max(address)
             low_word = self._controller.read(low_address, signed=False)
             if low_word is None:
                 return None
             self._export_limit = low_word
         else:
-            self._export_limit = self._controller.read(addresses[0], signed=False)
+            self._export_limit = self._controller.read(address, signed=False)
 
         return self._export_limit
-
-    @export_limit.setter
-    def export_limit(self, value: int | None) -> None:
-        """Write the export limit to the configured address(es)"""
-        self._export_limit = value
-        addresses = self._addresses.export_limit
-
-        if value is None or addresses is None:
-            return
-
-        int_value = int(value)
-        if len(addresses) == 2:
-            high_word = int_value >> 16
-            low_word = int_value & 0xFFFF
-
-            start_address = min(addresses)
-            current_high_word = self._controller.read(start_address, signed=False)
-            current_low_word = self._controller.read(start_address + 1, signed=False)
-
-            async def _write_export_limit() -> None:
-                if current_high_word != high_word or current_low_word != low_word:
-                    await self._controller.write_registers(start_address, [high_word, low_word])
-
-            self._controller.hass.async_create_task(_write_export_limit())
-        else:
-            self._controller.hass.async_create_task(self._controller.write_register(addresses[0], int_value))
-
-        self._export_limit = int_value
 
     @property
     def remote_control_enabled(self) -> bool | None:
@@ -133,6 +107,39 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
     @property
     def remote_enable_address(self) -> int | None:
         return self._addresses.remote_enable
+
+    @export_limit.setter
+    def export_limit(self, value: int | None) -> None:
+        """Write the export limit to the configured address(es)"""
+        self._export_limit = value
+        address = self._addresses.export_limit
+
+        if value is not None and address is not None:
+            int_value = int(value)
+            if isinstance(address, list) and len(address) == 2:
+                high_word = int_value >> 16
+                low_word = int_value & 0xFFFF
+
+                start_address = min(address)
+                current_high_word = self._controller.read(start_address, signed=False)
+                current_low_word = self._controller.read(start_address + 1, signed=False)
+
+                async def _write_export_limit() -> None:
+                    if current_high_word != high_word or current_low_word != low_word:
+                        await self._controller.write_registers(start_address, [high_word, low_word])
+
+                self._controller.hass.async_create_task(_write_export_limit())
+            elif isinstance(address, list) and len(address) == 1:
+                self._controller.hass.async_create_task(
+                    self._controller.write_register(address[0], int_value)
+                )
+            else:
+                # For single register models (H1/H3/KH legacy)
+                self._controller.hass.async_create_task(
+                    self._controller.write_register(address, int_value)
+                )
+
+            self._export_limit = int_value
 
     async def _update(self) -> None:
         if not self._controller.is_connected:
@@ -356,7 +363,10 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
         # We therefore need to be a bit careful, and only disable remote control if we previously enabled it.
         # If we did have it enabled, but then restarted, then we just need to let the watchdog catch it.
 
-        if self._remote_control_enabled:
+        actual_remote_control_enabled = self.remote_control_enabled
+        cached_remote_control_enabled = self._remote_control_enabled
+
+        if cached_remote_control_enabled or actual_remote_control_enabled is True:
             self._remote_control_enabled = False
             await self._controller.write_register(self._addresses.remote_enable, 0)
 
@@ -384,7 +394,7 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
         await self._update()
 
     async def became_connected_callback(self) -> None:
-        self._remote_control_enabled = False
+        self._remote_control_enabled = self.remote_control_enabled is True
         await self._update()
 
     def update_callback(self, changed_addresses: set[int]) -> None:
