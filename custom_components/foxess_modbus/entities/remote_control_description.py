@@ -129,11 +129,33 @@ REMOTE_CONTROL_DESCRIPTION = ModbusRemoteControlFactory(
                 export_limit=[46617, 46616],
                 max_soc=46610,
                 invbatpower=[39238, 39237],
+                battery_soc=[37612],
+                pwr_limit_bat_up=[46019, 46018],
+                pv_voltages=[39070, 39072, 39074, 39076, 39078, 39080],
+            ),
+            models=Inv.H3_SMART,
+        ),
+        RemoteControlAddressSpec(
+            # The H3 doesn't support anything above 44005, and the active/reactive power regisers are 2 values
+            # The Kuara H3 doesn't support this, see https://github.com/nathanmarlor/foxess_modbus/issues/532
+            holding=ModbusRemoteControlAddressConfig(
+                remote_enable=46001,
+                timeout_set=46002,
+                active_power=[46004, 46003],
+                work_mode=49203,
+                work_mode_map={
+                    WorkMode.SELF_USE: 1,
+                    WorkMode.FEED_IN_FIRST: 2,
+                    WorkMode.BACK_UP: 3,
+                },
+                export_limit=[46617, 46616],
+                max_soc=46610,
+                invbatpower=[39238, 39237],
                 battery_soc=[37612, 38310],
                 pwr_limit_bat_up=[46019, 46018],
                 pv_voltages=[39070, 39072, 39074, 39076, 39078, 39080],
             ),
-            models=Inv.H3_PRO_SET | Inv.H3_SMART,
+            models=Inv.H3_PRO_SET,
         ),
     ]
 )

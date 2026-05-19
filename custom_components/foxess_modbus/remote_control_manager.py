@@ -34,6 +34,7 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
             *self._addresses.battery_soc,
             self._addresses.remote_enable,
             self._addresses.work_mode,
+            *self._addresses.active_power,
             *(self._addresses.export_limit if self._addresses.export_limit is not None else []),
             self._addresses.max_soc,
             *self._addresses.invbatpower,
@@ -50,8 +51,17 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
 
     async def set_mode(self, mode: RemoteControlMode) -> None:
         should_force_disable = mode == RemoteControlMode.DISABLE and self.remote_control_enabled is not False
+        should_force_enable = mode != RemoteControlMode.DISABLE and self.remote_control_enabled is not True
 
-        if self._mode != mode or should_force_disable:
+        if self._mode != mode or should_force_disable or should_force_enable:
+            _LOGGER.debug(
+                "Remote control mode change requested: %s -> %s (remote_control_enabled=%s, should_force_disable=%s, should_force_enable=%s)",
+                self._mode,
+                mode,
+                self.remote_control_enabled,
+                should_force_disable,
+                should_force_enable,
+            )
             self._mode = mode
             await self._update()
 
@@ -101,12 +111,24 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
     def remote_control_enabled(self) -> bool | None:
         value = self._controller.read(self._addresses.remote_enable, signed=False)
         if value is None:
+            _LOGGER.debug(
+                "Remote control enable register %s is unavailable",
+                self._addresses.remote_enable,
+            )
             return None
         return value != 0
 
     @property
     def remote_enable_address(self) -> int | None:
         return self._addresses.remote_enable
+
+    @property
+    def active_power(self) -> int | None:
+        return self._controller.read(self._addresses.active_power, signed=True)
+
+    @property
+    def active_power_addresses(self) -> list[int]:
+        return self._addresses.active_power
 
     @export_limit.setter
     def export_limit(self, value: int | None) -> None:
@@ -207,9 +229,8 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
             max_soc = self._read(self._addresses.max_soc, signed=False)
 
         if soc is not None and max_soc is not None and soc >= max_soc:
-            _LOGGER.debug("Force charge: soc %s%% >= max soc %s%%, using Back-up", soc, max_soc)
-            # Avoid discharging the battery with Back-Up
-            await self._disable_remote_control(WorkMode.BACK_UP)
+            _LOGGER.debug("Force charge: soc %s%% >= max soc %s%%, using Self Use", soc, max_soc)
+            await self._disable_remote_control(WorkMode.SELF_USE)
             return
 
         # If it's daylight, both PV and the input power are bringing power into the inverter. The input power will
@@ -244,25 +265,26 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
         # (If we do, we can end up limiting the power to the max PV power, rather than the max inverter input power).
         if not self._has_any_pv_voltage():
             _LOGGER.debug("Remote control: no sun (or PV unavailable), defaulting to %sW", max_import_power)
-            # If remote control stops, we want to be in Back-up
-            await self._enable_remote_control(WorkMode.BACK_UP)
+            # If remote control stops, we want to be in Self Use
+            await self._enable_remote_control(WorkMode.SELF_USE)
             await self._write_active_power(-max_import_power)
             return
 
-        # These are both negative
-        # max_battery_charge_power_negative isn't available on the H1 over LAN
-        max_battery_charge_power_negative = self._read(self._addresses.pwr_limit_bat_up, signed=True)
+        # invbatpower is negative while charging.
+        # pwr_limit_bat_up appears to use different sign conventions across models / firmwares, so treat it as an
+        # absolute limit.
+        max_battery_charge_power_raw = self._read(self._addresses.pwr_limit_bat_up, signed=True)
         current_battery_charge_power_negative = self._read(self._addresses.invbatpower, signed=True)
-        if max_battery_charge_power_negative is None or current_battery_charge_power_negative is None:
+        if max_battery_charge_power_raw is None or current_battery_charge_power_negative is None:
             _LOGGER.debug(
                 "Remote control: max or current battery charge power unavailable, defaulting to %sW",
                 max_import_power,
             )
-            await self._enable_remote_control(WorkMode.BACK_UP)
+            await self._enable_remote_control(WorkMode.SELF_USE)
             await self._write_active_power(-max_import_power)
             return
 
-        max_battery_charge_power = -max_battery_charge_power_negative
+        max_battery_charge_power = abs(max_battery_charge_power_raw)
         current_battery_charge_power = -current_battery_charge_power_negative
 
         # If the BMS has decided not to charge the battery (which it might do if it's almost full), then don't try and
@@ -270,8 +292,8 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
         # Similarly, if the max battery power is very small, we won't be able to set the setpoint such that there's a
         # margin for PV, which means we run the risk of completely clipping PV.
         if max_battery_charge_power < 50:
-            _LOGGER.debug("Remote control: max battery charge power is %sW, using Back-up", max_battery_charge_power)
-            await self._disable_remote_control(WorkMode.BACK_UP)
+            _LOGGER.debug("Remote control: max battery charge power is %sW, using Self Use", max_battery_charge_power)
+            await self._disable_remote_control(WorkMode.SELF_USE)
             return
 
         # If we're just switching to export, do a cycle with 0 import. This tells us how much PV is providing
@@ -317,8 +339,8 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
                 self._current_import_power,
             )
 
-        # If remote control stops, we want to be in Back-up, charging as much as we can
-        await self._enable_remote_control(WorkMode.BACK_UP)
+        # If remote control stops, we want to be in Self Use
+        await self._enable_remote_control(WorkMode.SELF_USE)
         await self._write_active_power(-self._current_import_power)
 
     async def _update_discharge(self) -> None:
@@ -337,6 +359,24 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
         await self._write_active_power(export_power)
 
     async def _enable_remote_control(self, fallback_work_mode: WorkMode) -> None:
+        actual_remote_control_enabled = self.remote_control_enabled
+
+        if not self._remote_control_enabled or actual_remote_control_enabled is not True:
+            self._remote_control_enabled = True
+            timeout = self._poll_rate * 2
+
+            _LOGGER.debug(
+                "Remote control enabling: setting timeout=%s and enable register %s=1 (cached_enabled=%s, actual_enabled=%s)",
+                timeout,
+                self._addresses.remote_enable,
+                self._remote_control_enabled,
+                actual_remote_control_enabled,
+            )
+
+            # We can't do multi-register writes to these registers
+            await self._controller.write_register(self._addresses.timeout_set, timeout)
+            await self._controller.write_register(self._addresses.remote_enable, 1)
+
         # We set a fallback work mode so that the inverter still does "roughly" the right thing if we disconnect
         # (This might not be available, e.g. on H1 LAN)
         if (
@@ -347,15 +387,14 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
             fallback_work_mode_value = self._addresses.work_mode_map[fallback_work_mode]
             current_work_mode = self._read(self._addresses.work_mode, signed=False)
             if current_work_mode != fallback_work_mode_value:
+                _LOGGER.debug(
+                    "Remote control enabling: updating fallback work mode register %s from %s to %s (%s)",
+                    self._addresses.work_mode,
+                    current_work_mode,
+                    fallback_work_mode_value,
+                    fallback_work_mode,
+                )
                 await self._controller.write_register(self._addresses.work_mode, fallback_work_mode_value)
-
-        if not self._remote_control_enabled:
-            self._remote_control_enabled = True
-            timeout = self._poll_rate * 2
-
-            # We can't do multi-register writes to these registers
-            await self._controller.write_register(self._addresses.timeout_set, timeout)
-            await self._controller.write_register(self._addresses.remote_enable, 1)
 
     async def _disable_remote_control(self, work_mode: WorkMode | None = None) -> None:
         # The strategy periods feature of the foxess app use the remote control register internally. If we disable
@@ -368,6 +407,12 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
 
         if cached_remote_control_enabled or actual_remote_control_enabled is True:
             self._remote_control_enabled = False
+            _LOGGER.debug(
+                "Remote control disabling: setting enable register %s=0 (cached_enabled=%s, actual_enabled=%s)",
+                self._addresses.remote_enable,
+                cached_remote_control_enabled,
+                actual_remote_control_enabled,
+            )
             await self._controller.write_register(self._addresses.remote_enable, 0)
 
         # This might not be available, e.g. on H1 LAN
@@ -379,6 +424,13 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
             current_work_mode = self._read(self._addresses.work_mode, signed=False)
             work_mode_value = self._addresses.work_mode_map[work_mode]
             if current_work_mode != work_mode_value:
+                _LOGGER.debug(
+                    "Remote control disabling: updating work mode register %s from %s to %s (%s)",
+                    self._addresses.work_mode,
+                    current_work_mode,
+                    work_mode_value,
+                    work_mode,
+                )
                 await self._controller.write_register(self._addresses.work_mode, work_mode_value)
 
     def _read(self, address: list[int] | int | None, signed: bool) -> int | None:
@@ -395,6 +447,11 @@ class RemoteControlManager(EntityRemoteControlManager, ModbusControllerEntity):
 
     async def became_connected_callback(self) -> None:
         self._remote_control_enabled = self.remote_control_enabled is True
+        _LOGGER.debug(
+            "Remote control connection restored: cached enabled state set to %s from register %s",
+            self._remote_control_enabled,
+            self._addresses.remote_enable,
+        )
         await self._update()
 
     def update_callback(self, changed_addresses: set[int]) -> None:

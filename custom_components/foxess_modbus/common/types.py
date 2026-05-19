@@ -89,7 +89,9 @@ class Inv(Flag):
     H3_PRO_122 = auto()
     H3_PRO_SET = H3_PRO_PRE122 | H3_PRO_122
 
-    H3_SMART = auto()
+    H3_SMART_OTHER = auto()
+    H3_SMART_15 = auto()
+    H3_SMART = H3_SMART_OTHER | H3_SMART_15
 
     ALL = H1_LAN | H1_G1 | H1_G2_SET | KH_SET | H3_SET | H3_PRO_SET | H3_SMART
 

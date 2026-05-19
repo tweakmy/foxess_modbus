@@ -17,6 +17,7 @@ from .common.types import InverterModel
 from .common.types import RegisterType
 from .const import INVERTER_BASE
 from .const import INVERTER_CONN
+from .const import INVERTER_MODEL
 from .const import INVERTER_VERSION
 from .entities.charge_period_descriptions import CHARGE_PERIODS
 from .entities.entity_descriptions import ENTITIES
@@ -155,7 +156,14 @@ class InverterModelConnectionTypeProfile:
         version_from_config = controller.inverter_details.get(INVERTER_VERSION)
 
         inverter_version = Version.parse(version_from_config) if version_from_config is not None else None
-        return self.get_inv_for_version(inverter_version)
+        inv = self.get_inv_for_version(inverter_version)
+
+        if inv == Inv.H3_SMART:
+            inverter_model = controller.inverter_details[INVERTER_MODEL]
+            capacity = self.inverter_model_profile.inverter_capacity(inverter_model)
+            return Inv.H3_SMART_15 if capacity == 15000 else Inv.H3_SMART_OTHER
+
+        return inv
 
     def get_inv_for_version(self, version: Version | None) -> Inv:
         # Used for pytests

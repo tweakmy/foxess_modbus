@@ -5,6 +5,8 @@ from typing import Callable
 
 from homeassistant.components.number import NumberDeviceClass
 from homeassistant.components.number import NumberMode
+from homeassistant.components.sensor import SensorDeviceClass
+from homeassistant.components.sensor import SensorStateClass
 
 from ..common.entity_controller import EntityController
 from ..common.entity_controller import EntityRemoteControlManager
@@ -14,8 +16,10 @@ from .entity_factory import EntityFactory
 from .inverter_model_spec import EntitySpec
 from .inverter_model_spec import InverterModelSpec
 from .inverter_model_spec import ModbusAddressSpecBase
+from .modbus_enum_sensor import ModbusEnumSensorDescription
 from .modbus_remote_control_number import ModbusRemoteControlNumberDescription
 from .modbus_remote_control_select import ModbusRemoteControlSelectDescription
+from .modbus_sensor import ModbusSensorDescription
 
 
 class WorkMode(Enum):
@@ -98,6 +102,51 @@ class RemoteControlAddressSpec:
             addresses[register_type] = [address] if address is not None else None
         return ModbusAddressSpecBase(addresses, self.models)
 
+    def _get_addresses(
+        self, accessor: Callable[[ModbusRemoteControlAddressConfig], list[int] | None]
+    ) -> InverterModelSpec:
+        addresses = {}
+        for register_type, address_config in self.register_types.items():
+            addresses[register_type] = accessor(address_config)
+        return ModbusAddressSpecBase(addresses, self.models)
+
+    def get_remote_enable_address(self) -> InverterModelSpec:
+        """Gets an InverterModelSpec instance to describe the remote enable address."""
+        return self._get_address(lambda config: config.remote_enable)
+
+    def get_work_mode_address(self) -> InverterModelSpec:
+        """Gets an InverterModelSpec instance to describe the work mode address."""
+        return self._get_address(lambda config: config.work_mode)
+
+    def get_active_power_addresses(self) -> InverterModelSpec:
+        """Gets an InverterModelSpec instance to describe the active power address or addresses."""
+        return self._get_addresses(lambda config: config.active_power)
+
+    def get_work_mode_options_map(self) -> dict[int, str] | None:
+        """Gets a select options map for the native work mode register."""
+        options_map: dict[int, str] | None = None
+        for address_config in self.register_types.values():
+            if address_config.work_mode is None or address_config.work_mode_map is None:
+                continue
+
+            current_options_map = {
+                address_config.work_mode_map[WorkMode.SELF_USE]: "Self Use",
+                address_config.work_mode_map[WorkMode.FEED_IN_FIRST]: "Feed-in First",
+                address_config.work_mode_map[WorkMode.BACK_UP]: "Back-up",
+            }
+
+            if 4 in address_config.work_mode_map.values():
+                current_options_map[4] = "Peak Shaving"
+
+            if options_map is None:
+                options_map = current_options_map
+            else:
+                assert options_map == current_options_map, (
+                    f"{self}: inconsistent native work mode maps across register types"
+                )
+
+        return options_map
+
 
 @dataclass
 class ModbusRemoteControlFactory:
@@ -165,6 +214,39 @@ class ModbusRemoteControlFactory:
             models=[x.get_models_without_work_mode() for x in self.address_specs],
         )
 
+        native_remote_control_select = ModbusEnumSensorDescription(
+            key="remote_control_native",
+            name="Remote Control (Native)",
+            address=[x.get_remote_enable_address() for x in self.address_specs],
+            options_map={0: "Disabled", 1: "Enabled"},
+        )
+
+        native_remote_control_power = ModbusSensorDescription(
+            key="remote_control_power_native",
+            name="Remote Control Power (Native)",
+            addresses=[x.get_active_power_addresses() for x in self.address_specs],
+            device_class=SensorDeviceClass.POWER,
+            state_class=SensorStateClass.MEASUREMENT,
+            native_unit_of_measurement="kW",
+            scale=0.001,
+            signed=True,
+        )
+
+        native_work_mode_selects = []
+        for address_spec in self.address_specs:
+            options_map = address_spec.get_work_mode_options_map()
+            if options_map is None:
+                continue
+
+            native_work_mode_selects.append(
+                ModbusEnumSensorDescription(
+                    key="work_mode_native",
+                    name="Work Mode (Native)",
+                    address=[address_spec.get_work_mode_address()],
+                    options_map=options_map,
+                )
+            )
+
         def _set_max_soc(manager: EntityRemoteControlManager, value: int) -> None:
             manager.max_soc = value
 
@@ -215,6 +297,9 @@ class ModbusRemoteControlFactory:
         )
 
         self.entity_descriptions: list[EntityFactory] = [
+            native_remote_control_select,
+            native_remote_control_power,
+            *native_work_mode_selects,
             export_limit,
             charge_power,
             discharge_power,

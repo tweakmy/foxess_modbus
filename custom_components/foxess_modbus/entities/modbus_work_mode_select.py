@@ -11,6 +11,8 @@ from .entity_factory import ENTITY_DESCRIPTION_KWARGS
 from .modbus_select import ModbusSelect
 from .modbus_select import ModbusSelectDescription
 
+_LOGGER = logging.getLogger(__package__)
+
 _FORCE_CHARGE = "Force Charge"
 _FORCE_DISCHARGE = "Force Discharge"
 _INVALID = "Invalid"
@@ -47,16 +49,47 @@ class ModbusWorkModeSelect(ModbusSelect):
         if self._controller.remote_control_manager is not None:
             mode = self._controller.remote_control_manager.mode
             remote_control_enabled = self._controller.remote_control_manager.remote_control_enabled
+            active_power = self._controller.remote_control_manager.active_power
             self._prev_remote_control_mode = mode
+
+            _LOGGER.debug(
+                "Work mode select '%s' evaluating with manager mode=%s remote_control_enabled=%s active_power=%s",
+                self.entity_id,
+                mode,
+                remote_control_enabled,
+                active_power,
+            )
 
             if remote_control_enabled is False and mode == RemoteControlMode.DISABLE:
                 self._prev_remote_control_mode = None
-                return super().current_option
-            if remote_control_enabled is True and mode == RemoteControlMode.FORCE_CHARGE:
-                return _FORCE_CHARGE
-            if remote_control_enabled is True and mode == RemoteControlMode.FORCE_DISCHARGE:
-                return _FORCE_DISCHARGE
+                selected = super().current_option
+                _LOGGER.debug(
+                    "Work mode select '%s' using inverter work mode option %s because remote control is disabled",
+                    self.entity_id,
+                    selected,
+                )
+                return selected
+            if remote_control_enabled is True:
+                if active_power is not None:
+                    if active_power < 0:
+                        return _FORCE_CHARGE
+                    if active_power > 0:
+                        return _FORCE_DISCHARGE
 
+                if mode == RemoteControlMode.FORCE_CHARGE:
+                    return _FORCE_CHARGE
+                if mode == RemoteControlMode.FORCE_DISCHARGE:
+                    return _FORCE_DISCHARGE
+
+            _LOGGER.debug(
+                "Work mode select '%s' returning internal '%s' state because manager mode=%s remote_control_enabled=%s and active_power=%s do not align; available options=%s. Home Assistant may show unknown if current_option is not in options.",
+                self.entity_id,
+                _INVALID,
+                mode,
+                remote_control_enabled,
+                active_power,
+                self._attr_options,
+            )
             return _INVALID
 
         self._prev_remote_control_mode = None
@@ -87,6 +120,7 @@ class ModbusWorkModeSelect(ModbusSelect):
             remote_enable_address = self._controller.remote_control_manager.remote_enable_address
             if remote_enable_address is not None:
                 addresses.append(remote_enable_address)
+            addresses.extend(self._controller.remote_control_manager.active_power_addresses)
 
         return addresses
 

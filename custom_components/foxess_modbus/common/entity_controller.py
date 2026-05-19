@@ -100,6 +100,16 @@ class EntityRemoteControlManager(ABC):
     def remote_enable_address(self) -> int | None:
         """Returns the remote enable register address, if available"""
 
+    @property
+    @abstractmethod
+    def active_power(self) -> int | None:
+        """Returns the current value of the native remote control active power register(s), if available"""
+
+    @property
+    @abstractmethod
+    def active_power_addresses(self) -> list[int]:
+        """Returns the remote control active power register address(es), if available"""
+
 
 
 class EntityController(ABC):

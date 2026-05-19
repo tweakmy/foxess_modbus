@@ -24,6 +24,7 @@ from ..const import ROUND_SENSOR_VALUES
 from .base_validator import BaseValidator
 from .entity_factory import ENTITY_DESCRIPTION_KWARGS
 from .entity_factory import EntityFactory
+from .inverter_model_spec import InverterModelSpec
 from .inverter_model_spec import ModbusAddressesSpec
 from .modbus_entity_mixin import ModbusEntityMixin
 
@@ -34,7 +35,7 @@ _LOGGER = logging.getLogger(__name__)
 class ModbusSensorDescription(SensorEntityDescription, EntityFactory):  # type: ignore[misc]
     """Custom sensor description"""
 
-    addresses: list[ModbusAddressesSpec]
+    addresses: list[InverterModelSpec]
     scale: float | None = None
     round_to: float | None = None
     post_process: Callable[[float], float] | None = None

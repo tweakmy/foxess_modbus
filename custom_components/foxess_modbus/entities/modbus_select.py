@@ -17,7 +17,7 @@ from ..common.types import RegisterType
 from .base_validator import BaseValidator
 from .entity_factory import ENTITY_DESCRIPTION_KWARGS
 from .entity_factory import EntityFactory
-from .inverter_model_spec import ModbusAddressSpec
+from .inverter_model_spec import InverterModelSpec
 from .modbus_entity_mixin import ModbusEntityMixin
 
 _LOGGER: logging.Logger = logging.getLogger(__package__)
@@ -27,7 +27,7 @@ _LOGGER: logging.Logger = logging.getLogger(__package__)
 class ModbusSelectDescription(SelectEntityDescription, EntityFactory):  # type: ignore[misc]
     """Custom select entity description"""
 
-    address: list[ModbusAddressSpec]
+    address: list[InverterModelSpec]
     options_map: dict[int, str]
     validate: list[BaseValidator] = field(default_factory=list)
 

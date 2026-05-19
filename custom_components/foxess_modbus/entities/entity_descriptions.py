@@ -1345,8 +1345,14 @@ def _inverter_entities() -> Iterable[EntityFactory]:
             ),
         ],
     )
-    yield _invbatvolt(index=1, addresses=[ModbusAddressesSpec(holding=[39227], models=Inv.H3_PRO_SET | Inv.H3_SMART)])
-    yield _invbatvolt(index=2, addresses=[ModbusAddressesSpec(holding=[39232], models=Inv.H3_PRO_SET | Inv.H3_SMART)])
+    yield _invbatvolt(
+        index=1,
+        addresses=[ModbusAddressesSpec(holding=[39227], models=Inv.H3_PRO_SET | Inv.H3_SMART)],
+    )
+    yield _invbatvolt(
+        index=2,
+        addresses=[ModbusAddressesSpec(holding=[39232], models=Inv.H3_PRO_SET)],
+    )
 
     def _invbatcurrent(index: int | None, scale: float, addresses: list[ModbusAddressesSpec]) -> EntityFactory:
         key_suffix = f"_{index}" if index is not None else ""
@@ -1381,7 +1387,7 @@ def _inverter_entities() -> Iterable[EntityFactory]:
     yield _invbatcurrent(
         index=2,
         scale=0.001,
-        addresses=[ModbusAddressesSpec(holding=[39234, 39233], models=Inv.H3_PRO_SET | Inv.H3_SMART)],
+        addresses=[ModbusAddressesSpec(holding=[39234, 39233], models=Inv.H3_PRO_SET)],
     )
 
     def _invbatpower(index: int | None, addresses: list[ModbusAddressesSpec]) -> Iterable[ModbusSensorDescription]:
@@ -1451,7 +1457,7 @@ def _inverter_entities() -> Iterable[EntityFactory]:
             # the H3 Pro firmware from Master 1.53, Manager 1.22 has corrected the endian for this
             # batpower2 register; it now matches the Fox modbus definition V1.05.00.00
             # see https://github.com/nathanmarlor/foxess_modbus/discussions/685#discussioncomment-10811413
-            ModbusAddressesSpec(holding=[39236, 39235], models=Inv.H3_PRO_SET | Inv.H3_SMART),
+            ModbusAddressesSpec(holding=[39236, 39235], models=Inv.H3_PRO_SET),
         ],
     )
 
@@ -2463,19 +2469,19 @@ def _bms_entities() -> Iterable[EntityFactory]:
     )
     yield from _inner(
         index=2,
-        bms_connect_state_address=[ModbusAddressSpec(holding=37700, models=Inv.H3_PRO_SET | Inv.H3_SMART)],
-        batvolt=[ModbusAddressesSpec(holding=[38307], models=Inv.H3_PRO_SET | Inv.H3_SMART)],
-        bat_current=[ModbusAddressesSpec(holding=[38308], models=Inv.H3_PRO_SET | Inv.H3_SMART)],
-        battery_soc=[ModbusAddressesSpec(holding=[38310], models=Inv.H3_PRO_SET | Inv.H3_SMART)],
+        bms_connect_state_address=[ModbusAddressSpec(holding=37700, models=Inv.H3_PRO_SET)],
+        batvolt=[ModbusAddressesSpec(holding=[38307], models=Inv.H3_PRO_SET)],
+        bat_current=[ModbusAddressesSpec(holding=[38308], models=Inv.H3_PRO_SET)],
+        battery_soc=[ModbusAddressesSpec(holding=[38310], models=Inv.H3_PRO_SET)],
         # Added in H3_PRO v1.25, which hasn't been released yet.
         # See https://github.com/nathanmarlor/foxess_modbus/pull/775#issuecomment-2656447502
-        battery_soh=[ModbusAddressesSpec(holding=[38322], models=Inv.H3_SMART)],
-        battery_temp=[ModbusAddressesSpec(holding=[38309], models=Inv.H3_PRO_SET | Inv.H3_SMART)],
-        bms_cell_temp_high=[ModbusAddressesSpec(holding=[38315], models=Inv.H3_PRO_SET | Inv.H3_SMART)],
-        bms_cell_temp_low=[ModbusAddressesSpec(holding=[38316], models=Inv.H3_PRO_SET | Inv.H3_SMART)],
-        bms_cell_mv_high=[ModbusAddressesSpec(holding=[38317], models=Inv.H3_PRO_SET | Inv.H3_SMART)],
-        bms_cell_mv_low=[ModbusAddressesSpec(holding=[38318], models=Inv.H3_PRO_SET | Inv.H3_SMART)],
-        bms_kwh_remaining=[ModbusAddressesSpec(holding=[38330], models=Inv.H3_PRO_SET | Inv.H3_SMART)],
+        battery_soh=[ModbusAddressesSpec(holding=[38322], models=Inv.H3_PRO_SET)],
+        battery_temp=[ModbusAddressesSpec(holding=[38309], models=Inv.H3_PRO_SET)],
+        bms_cell_temp_high=[ModbusAddressesSpec(holding=[38315], models=Inv.H3_PRO_SET)],
+        bms_cell_temp_low=[ModbusAddressesSpec(holding=[38316], models=Inv.H3_PRO_SET)],
+        bms_cell_mv_high=[ModbusAddressesSpec(holding=[38317], models=Inv.H3_PRO_SET)],
+        bms_cell_mv_low=[ModbusAddressesSpec(holding=[38318], models=Inv.H3_PRO_SET)],
+        bms_kwh_remaining=[ModbusAddressesSpec(holding=[38330], models=Inv.H3_PRO_SET)],
     )
 
 
